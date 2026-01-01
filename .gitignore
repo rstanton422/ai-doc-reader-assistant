@@ -138,6 +138,7 @@ celerybeat.pid
 .env
 .envrc
 .venv
+.doc-reader-venv
 env/
 venv/
 ENV/
