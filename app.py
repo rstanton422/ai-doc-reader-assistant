@@ -27,7 +27,7 @@ upload_pdf = st.file_uploader("Upload a PDF document", type='pdf')
 if upload_pdf is not None:
     
     # ───────────────────────────────────────────────────────────────────────
-    # THE "PROCESS DOCUMENT" BUTTON
+    # THE "Ask Me Anything About the Document" BUTTON
     # ───────────────────────────────────────────────────────────────────────
     # This prevents processing on every page refresh - only runs when clicked
     if st.button("Press Me So I Can Absorb Your Document"):
@@ -90,7 +90,8 @@ if upload_pdf is not None:
             #   index.faiss: The binary file containing the actual vector data and search structures
             #   index.pkl: A pickle file that stores the original text content (docstore) and 
             #              metadata associated with those vectors
-            vector_storage.save_local("faiss_index_react")
+            #vector_storage.save_local("faiss_index_react")     # saves to local
+            st.session_state.vector_store = vector_storage      # saves to RAM
             
             # Show success message with useful info
             st.success(f"Processed {len(splits)} chunks! Fire away on the questions")
@@ -103,7 +104,8 @@ if upload_pdf is not None:
     # ═══════════════════════════════════════════════════════════════════════
     # Only show this section if we've already processed a document
     # (Checking if the FAISS index folder exists)
-    if os.path.exists("faiss_index_react"):
+    #if os.path.exists("faiss_index_react"):     # checks the local disk
+    if "vector_store" in st.session_state:      # checks RAM
         
         st.markdown("---")  # Visual separator - just a horizontal line
         st.subheader("Ask a Question")
@@ -119,12 +121,13 @@ if upload_pdf is not None:
                     # STEP 7: Load the Saved Vector Database
                     # ───────────────────────────────────────────────────────
                     # Reload our previously saved FAISS index from disk
-                    vector_storage = FAISS.load_local(
-                        "faiss_index_react",
-                        OpenAIEmbeddings(),
-                        allow_dangerous_deserialization=True  # Needed for local pickle files
-                    )
-                    
+                    #vector_storage = FAISS.load_local(
+                    #    "faiss_index_react",
+                    #    OpenAIEmbeddings(),
+                    #    allow_dangerous_deserialization=True  # Needed for local pickle files
+                    #)
+                    vector_storage = st.session_state.vector_store  # loads from RAM
+
                     # ───────────────────────────────────────────────────────
                     # STEP 8: Find Relevant Chunks
                     # ───────────────────────────────────────────────────────
