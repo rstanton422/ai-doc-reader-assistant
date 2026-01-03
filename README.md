@@ -1,7 +1,7 @@
 # ai-doc-reader-assistant
-chat bot that reads a PDF and answers questions based solely on document
-this project defintiely pushed me and required tons of research to understand and apply concepts here within
-Definitely not a master and had to enlist online help... but one doesn't learn by reading alone. Applying adn trying, stumbling and succeeding are all part of the journey to mastery
+chat bot that reads a PDF and answers questions based solely on document.
+This project defintiely pushed me and required tons of research to understand and apply concepts here within.
+Definitely not a master and had to enlist online help... but one doesn't learn by reading alone. Applying and trying, stumbling and succeeding are all part of the journey to mastery.
 
 # AI Document Assistant (RAG Pipeline)
 
