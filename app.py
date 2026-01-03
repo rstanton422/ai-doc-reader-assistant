@@ -99,124 +99,124 @@ if upload_pdf is not None:
             # Clean up - delete the temp PDF since we're done with it
             os.remove(temp_file)
     
-    # ═══════════════════════════════════════════════════════════════════════
-    # STEP 6: Question and Answer Time
-    # ═══════════════════════════════════════════════════════════════════════
-    # Only show this section if we've already processed a document
-    # (Checking if the FAISS index folder exists)
-    #if os.path.exists("faiss_index_react"):     # checks the local disk
-    if "vector_store" in st.session_state:      # checks RAM
-        
-        st.markdown("---")  # Visual separator - just a horizontal line
-        st.subheader("Ask a Question")
-        
-        # Text input for user's question
-        user_question = st.text_input("What do you want to know about this document?")
-        
-        # Only run the search/answer logic if user typed something
-        if user_question:
-            with st.spinner("Thinkin'..."):
-                try:
-                    # ───────────────────────────────────────────────────────
-                    # STEP 7: Load the Saved Vector Database
-                    # ───────────────────────────────────────────────────────
-                    # Reload our previously saved FAISS index from disk
-                    #vector_storage = FAISS.load_local(
-                    #    "faiss_index_react",
-                    #    OpenAIEmbeddings(),
-                    #    allow_dangerous_deserialization=True  # Needed for local pickle files
-                    #)
-                    vector_storage = st.session_state.vector_store  # loads from RAM
+# ═══════════════════════════════════════════════════════════════════════
+# STEP 6: Question and Answer Time
+# ═══════════════════════════════════════════════════════════════════════
+# Only show this section if we've already processed a document
+# (Checking if the FAISS index folder exists)
+#if os.path.exists("faiss_index_react"):     # checks the local disk
+if "vector_store" in st.session_state:      # checks RAM
+    
+    st.markdown("---")  # Visual separator - just a horizontal line
+    st.subheader("Ask a Question")
+    
+    # Text input for user's question
+    user_question = st.text_input("What do you want to know about this document?")
+    
+    # Only run the search/answer logic if user typed something
+    if user_question:
+        with st.spinner("Thinkin'..."):
+            try:
+                # ───────────────────────────────────────────────────────
+                # STEP 7: Load the Saved Vector Database
+                # ───────────────────────────────────────────────────────
+                # Reload our previously saved FAISS index from disk
+                #vector_storage = FAISS.load_local(
+                #    "faiss_index_react",
+                #    OpenAIEmbeddings(),
+                #    allow_dangerous_deserialization=True  # Needed for local pickle files
+                #)
+                vector_storage = st.session_state.vector_store  # loads from RAM
 
-                    # ───────────────────────────────────────────────────────
-                    # STEP 8: Find Relevant Chunks
-                    # ───────────────────────────────────────────────────────
-                    # Convert user's question to a vector, then find the 3 most similar chunks
-                    # "similarity" search = cosine similarity between vectors
-                    # Think: "Which chunks talk about similar things to my question?"
-                    retriever = vector_storage.as_retriever(
-                        search_type="similarity",
-                        search_kwargs={"k": 3}  # Return top 3 matches
-                    )
-                    relevant_docs = retriever.invoke(user_question)
-                    
-                    # ═══════════════════════════════════════════════════════
-                    # STEP 9: Build the LangChain Pipeline
-                    # ═══════════════════════════════════════════════════════
-                    # This is where we assemble the answer generation chain
-                    
-                    from langchain_openai import ChatOpenAI
-                    from langchain_core.prompts import ChatPromptTemplate
-                    from langchain_core.output_parsers import StrOutputParser
-                    from langchain_core.runnables import RunnablePassthrough
-                    
-                    # Initialize GPT-3.5 with temperature=0 for consistent, factual answers
-                    # (Higher temperature = more creative/random, lower = more deterministic)
-                    llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
-                    
-                    # ───────────────────────────────────────────────────────
-                    # STEP 10: Create the Prompt Template
-                    # ───────────────────────────────────────────────────────
-                    # This is our instructions to the AI
-                    # We're forcing it to ONLY use the retrieved chunks (no hallucinations!)
-                    template = """Answer the question based ONLY on the following context:
-                    {context}
+                # ───────────────────────────────────────────────────────
+                # STEP 8: Find Relevant Chunks
+                # ───────────────────────────────────────────────────────
+                # Convert user's question to a vector, then find the 3 most similar chunks
+                # "similarity" search = cosine similarity between vectors
+                # Think: "Which chunks talk about similar things to my question?"
+                retriever = vector_storage.as_retriever(
+                    search_type="similarity",
+                    search_kwargs={"k": 3}  # Return top 3 matches
+                )
+                relevant_docs = retriever.invoke(user_question)
+                
+                # ═══════════════════════════════════════════════════════
+                # STEP 9: Build the LangChain Pipeline
+                # ═══════════════════════════════════════════════════════
+                # This is where we assemble the answer generation chain
+                
+                from langchain_openai import ChatOpenAI
+                from langchain_core.prompts import ChatPromptTemplate
+                from langchain_core.output_parsers import StrOutputParser
+                from langchain_core.runnables import RunnablePassthrough
+                
+                # Initialize GPT-3.5 with temperature=0 for consistent, factual answers
+                # (Higher temperature = more creative/random, lower = more deterministic)
+                llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
+                
+                # ───────────────────────────────────────────────────────
+                # STEP 10: Create the Prompt Template
+                # ───────────────────────────────────────────────────────
+                # This is our instructions to the AI
+                # We're forcing it to ONLY use the retrieved chunks (no hallucinations!)
+                template = """Answer the question based ONLY on the following context:
+                {context}
 
-                    Question: {question}
-                    """
-                    prompt = ChatPromptTemplate.from_template(template)
-                    
-                    # ───────────────────────────────────────────────────────
-                    # Helper Function: Format Retrieved Chunks
-                    # ───────────────────────────────────────────────────────
-                    # Combine the 3 chunks into one big string with double line breaks
-                    # This becomes the "context" that gets inserted into the prompt
-                    # Takes a list of document chunks and smushes them into one big string with 
-                    # double line breaks between each chunk.
-                    def format_docs(docs):
-                        return "\n\n".join([d.page_content for d in docs])
-                    
-                    # ───────────────────────────────────────────────────────
-                    # STEP 11: Assemble the Chain
-                    # ───────────────────────────────────────────────────────
-                    # This is LangChain's "pipe" syntax (|)
-                    # Read it left to right: Input --> Transform --> LLM --> Parse Output
-                    # 
-                    # Flow:
-                    # 1. {"context": format_docs(), "question": pass-through}
-                    # 2. Inject those into the prompt template
-                    # 3. Send completed prompt to GPT
-                    # 4. Parse the response as a plain string
-                    chain = (
-                        {
-                            "context": lambda x: format_docs(relevant_docs),  # Format chunks
-                            "question": RunnablePassthrough()  # Pass question through unchanged
-                        }
-                        | prompt              # Fill in the template
-                        | llm                 # Send to GPT
-                        | StrOutputParser()   # Extract text from response
-                    )
-                    
-                    # ───────────────────────────────────────────────────────
-                    # STEP 12: Get the Answer
-                    # ───────────────────────────────────────────────────────
-                    # Run the whole chain with the user's question
-                    response = chain.invoke(user_question)
-                    
-                    # Display the AI's answer
-                    st.write(response)
-                    
-                    # ───────────────────────────────────────────────────────
-                    # BONUS: Show Sources (The Pro Move™)
-                    # ───────────────────────────────────────────────────────
-                    # This is how you build trust - let users verify the AI's sources
-                    # Hidden by default in an expandable section to avoid clutter
-                    with st.expander("See relevant document chunks"):
-                        for i, doc in enumerate(relevant_docs):
-                            st.write(f"**Chunk {i+1}:**")
-                            st.write(doc.page_content)
-                    
-                except Exception as e:
-                    # If anything breaks, show a friendly error message
-                    st.error(f"Error: {e}")
-                    st.info("Tip: Make sure you processed a document first!")
+                Question: {question}
+                """
+                prompt = ChatPromptTemplate.from_template(template)
+                
+                # ───────────────────────────────────────────────────────
+                # Helper Function: Format Retrieved Chunks
+                # ───────────────────────────────────────────────────────
+                # Combine the 3 chunks into one big string with double line breaks
+                # This becomes the "context" that gets inserted into the prompt
+                # Takes a list of document chunks and smushes them into one big string with 
+                # double line breaks between each chunk.
+                def format_docs(docs):
+                    return "\n\n".join([d.page_content for d in docs])
+                
+                # ───────────────────────────────────────────────────────
+                # STEP 11: Assemble the Chain
+                # ───────────────────────────────────────────────────────
+                # This is LangChain's "pipe" syntax (|)
+                # Read it left to right: Input --> Transform --> LLM --> Parse Output
+                # 
+                # Flow:
+                # 1. {"context": format_docs(), "question": pass-through}
+                # 2. Inject those into the prompt template
+                # 3. Send completed prompt to GPT
+                # 4. Parse the response as a plain string
+                chain = (
+                    {
+                        "context": lambda x: format_docs(relevant_docs),  # Format chunks
+                        "question": RunnablePassthrough()  # Pass question through unchanged
+                    }
+                    | prompt              # Fill in the template
+                    | llm                 # Send to GPT
+                    | StrOutputParser()   # Extract text from response
+                )
+                
+                # ───────────────────────────────────────────────────────
+                # STEP 12: Get the Answer
+                # ───────────────────────────────────────────────────────
+                # Run the whole chain with the user's question
+                response = chain.invoke(user_question)
+                
+                # Display the AI's answer
+                st.write(response)
+                
+                # ───────────────────────────────────────────────────────
+                # BONUS: Show Sources (The Pro Move™)
+                # ───────────────────────────────────────────────────────
+                # This is how you build trust - let users verify the AI's sources
+                # Hidden by default in an expandable section to avoid clutter
+                with st.expander("See relevant document chunks"):
+                    for i, doc in enumerate(relevant_docs):
+                        st.write(f"**Chunk {i+1}:**")
+                        st.write(doc.page_content)
+                
+            except Exception as e:
+                # If anything breaks, show a friendly error message
+                st.error(f"Error: {e}")
+                st.info("Tip: Make sure you processed a document first!")
